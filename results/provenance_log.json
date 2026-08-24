@@ -1,0 +1,93 @@
+[
+  {
+    "round": 1,
+    "timestamp": "2026-08-24T03:36:41.333741",
+    "participating_hospitals": [
+      "Hospital_1",
+      "Hospital_2",
+      "Hospital_3"
+    ],
+    "flagged_hospitals": [],
+    "accuracy": 84.55,
+    "model_hash": "f4868c915814b151",
+    "per_hospital_accuracy": {
+      "Hospital_1": 84.38,
+      "Hospital_2": 84.82,
+      "Hospital_3": 84.46
+    }
+  },
+  {
+    "round": 2,
+    "timestamp": "2026-08-24T03:37:16.982671",
+    "participating_hospitals": [
+      "Hospital_1",
+      "Hospital_2",
+      "Hospital_3"
+    ],
+    "flagged_hospitals": [],
+    "accuracy": 89.2,
+    "model_hash": "9489f7cd49867b6e",
+    "per_hospital_accuracy": {
+      "Hospital_1": 88.12,
+      "Hospital_2": 89.82,
+      "Hospital_3": 89.64
+    }
+  },
+  {
+    "round": 3,
+    "timestamp": "2026-08-24T03:37:52.760480",
+    "participating_hospitals": [
+      "Hospital_1",
+      "Hospital_2",
+      "Hospital_3"
+    ],
+    "flagged_hospitals": [
+      "Hospital_3"
+    ],
+    "accuracy": 86.76,
+    "model_hash": "d113f00f86f82c20",
+    "per_hospital_accuracy": {
+      "Hospital_1": 86.88,
+      "Hospital_2": 86.43,
+      "Hospital_3": 86.96
+    }
+  },
+  {
+    "round": 4,
+    "timestamp": "2026-08-24T03:38:27.715006",
+    "participating_hospitals": [
+      "Hospital_1",
+      "Hospital_2",
+      "Hospital_3"
+    ],
+    "flagged_hospitals": [
+      "Hospital_3"
+    ],
+    "accuracy": 91.43,
+    "model_hash": "91d0a02407365f97",
+    "per_hospital_accuracy": {
+      "Hospital_1": 90.0,
+      "Hospital_2": 92.5,
+      "Hospital_3": 91.79
+    }
+  },
+  {
+    "round": 5,
+    "timestamp": "2026-08-24T03:39:04.108868",
+    "participating_hospitals": [
+      "Hospital_1",
+      "Hospital_2",
+      "Hospital_3"
+    ],
+    "flagged_hospitals": [
+      "Hospital_3"
+    ],
+    "accuracy": 90.78,
+    "model_hash": "096929c335d5d716",
+    "per_hospital_accuracy": {
+      "Hospital_1": 90.21,
+      "Hospital_2": 91.61,
+      "Hospital_3": 90.54
+    }
+  }
+]

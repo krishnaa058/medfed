@@ -168,15 +168,57 @@ st.divider()
 # 4B. HOSPITAL-SIDE LOCAL TRAINING SIMULATOR (real upload + conversion demo)
 # ---------------------------------------------------------------------------
 
-st.subheader("🖥️ Hospital Local Training — Upload Real Data & Convert")
-st.caption("Upload real MRI images. Our actual trained model processes them locally and outputs a numeric representation (model embeddings) — never a diagnosis, never the raw image — which is what gets shared with the platform.")
+st.subheader("🖥️ Hospital Local Training — Live Walkthrough")
+st.caption("Two ways to see it in action: a quick simulated round, or upload real images and watch our actual trained model process them.")
 
 sim_col1, sim_col2 = st.columns([1, 2])
 
 with sim_col1:
     selected_hospital = st.selectbox("Simulating as:", hospitals, key="sim_hospital")
+    st.write(f"**Local dataset:** {hospital_info[selected_hospital]['train']} training images")
     st.write(f"**Specialty mix:** {hospital_info[selected_hospital]['specialty']}")
 
+    quick_run_button = st.button("▶️ Run Local Training Round", key="run_local_training")
+
+with sim_col2:
+    if quick_run_button:
+        quick_steps = [
+            ("📥 Loading local model (global weights received from platform)...", 0.3),
+            (f"🧠 Training on {selected_hospital}'s private data (1 epoch, on-device)...", 0.8),
+            ("📊 Computing local model update (weight deltas)...", 0.3),
+            ("🔒 Encrypting update before transmission...", 0.3),
+            ("📤 Sending ONLY encrypted weights to central platform (no images sent)...", 0.4),
+        ]
+        quick_progress = st.progress(0)
+        quick_status = st.empty()
+
+        import time
+        for i, (label, duration) in enumerate(quick_steps):
+            quick_status.info(label)
+            time.sleep(duration)
+            quick_progress.progress((i + 1) / len(quick_steps))
+
+        quick_status.success(f"✅ {selected_hospital}'s update received and verified by central platform.")
+
+        idx = hospitals.index(selected_hospital)
+        local_before = fed_accuracy_history[0] - (5 * idx)
+        local_after = fed_accuracy_history[-2]
+        qc1, qc2, qc3 = st.columns(3)
+        qc1.metric("Local accuracy before this round", f"{max(local_before, 40):.1f}%")
+        qc2.metric("Local accuracy after this round", f"{local_after:.1f}%", f"+{local_after - max(local_before,40):.1f}%")
+        qc3.metric("Data shared with platform", "0 images", "Only weights")
+    else:
+        st.info("👆 Click **Run Local Training Round** for a quick simulated round based on our real experiment results.")
+
+st.divider()
+
+# --- Real upload + genuine model-based conversion ---
+st.markdown("##### 🔬 Or: Upload Real Data & Convert (uses our actual trained model)")
+st.caption("Upload real MRI images. Our actual trained model processes them locally and outputs a numeric representation (model embeddings) — never a diagnosis, never the raw image — which is what gets shared with the platform.")
+
+up_col1, up_col2 = st.columns([1, 2])
+
+with up_col1:
     uploaded_dataset_files = st.file_uploader(
         "📁 Upload MRI images to convert (jpg/png, multiple allowed):",
         type=["jpg", "jpeg", "png"],
@@ -184,7 +226,7 @@ with sim_col1:
         key="dataset_upload"
     )
 
-    run_button = st.button("▶️ Convert to Federated-Safe Data", key="run_local_training")
+    run_button = st.button("▶️ Convert to Federated-Safe Data", key="run_conversion")
 
 @st.cache_resource
 def load_federated_model():
@@ -195,7 +237,7 @@ def load_federated_model():
     except Exception:
         return None
 
-with sim_col2:
+with up_col2:
     if run_button:
         if not uploaded_dataset_files:
             st.warning("Please upload at least one image first.")
@@ -214,7 +256,6 @@ with sim_col2:
                 progress_bar = st.progress(0)
                 status_text = st.empty()
 
-                import time
                 for i, (label, duration) in enumerate(steps):
                     status_text.info(label)
                     time.sleep(duration)

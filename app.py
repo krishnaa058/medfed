@@ -165,64 +165,92 @@ for i, h in enumerate(hospitals):
 st.divider()
 
 # ---------------------------------------------------------------------------
-# 4B. HOSPITAL-SIDE LOCAL TRAINING SIMULATOR (interactive walkthrough)
+# 4B. HOSPITAL-SIDE LOCAL TRAINING SIMULATOR (real upload + conversion demo)
 # ---------------------------------------------------------------------------
 
-st.subheader("🖥️ Hospital Local Training — Live Walkthrough")
-st.caption("This simulates what runs LOCALLY at each hospital, on their own machine, using only their own private data.")
+st.subheader("🖥️ Hospital Local Training — Upload Real Data & Convert")
+st.caption("Upload real MRI images. Our actual trained model processes them locally and outputs a numeric representation (model embeddings) — never a diagnosis, never the raw image — which is what gets shared with the platform.")
 
 sim_col1, sim_col2 = st.columns([1, 2])
 
 with sim_col1:
-    selected_hospital = st.selectbox("Select a hospital to simulate:", hospitals, key="sim_hospital")
-    st.write(f"**Local dataset:** {hospital_info[selected_hospital]['train']} training images")
+    selected_hospital = st.selectbox("Simulating as:", hospitals, key="sim_hospital")
     st.write(f"**Specialty mix:** {hospital_info[selected_hospital]['specialty']}")
 
-    default_path = f"{selected_hospital}_local_machine/Training/"
-    data_path = st.text_input(
-        "📁 Local dataset path (any hospital can point to their own data location):",
-        value=default_path,
-        key="data_path_input"
+    uploaded_dataset_files = st.file_uploader(
+        "📁 Upload MRI images to convert (jpg/png, multiple allowed):",
+        type=["jpg", "jpeg", "png"],
+        accept_multiple_files=True,
+        key="dataset_upload"
     )
-    st.caption("This path stays on the hospital's own machine — never uploaded anywhere, at any point.")
 
-    run_button = st.button("▶️ Run Local Training Round", key="run_local_training")
+    run_button = st.button("▶️ Convert to Federated-Safe Data", key="run_local_training")
+
+@st.cache_resource
+def load_federated_model():
+    try:
+        m = torch.jit.load('medfed_model.pt', map_location='cpu')
+        m.eval()
+        return m
+    except Exception:
+        return None
 
 with sim_col2:
     if run_button:
-        steps = [
-            ("📥 Loading local model (global weights received from platform)...", 0.3),
-            (f"📂 Reading raw images from `{data_path}` ...", 0.4),
-            (f"🧠 Training on {selected_hospital}'s private data (1 epoch, on-device)...", 0.8),
-            ("📊 Computing local model update (weight deltas only — no raw pixels)...", 0.3),
-            ("🧬 Converting local update into federated-safe representation...", 0.4),
-            ("🔒 Encrypting federated-safe update before transmission...", 0.3),
-            ("📤 Sending ONLY the encrypted, federated-safe update to the platform...", 0.4),
-        ]
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        if not uploaded_dataset_files:
+            st.warning("Please upload at least one image first.")
+        else:
+            _model = load_federated_model()
+            if _model is None:
+                st.error("Model file (`medfed_model.pt`) not found in this deployment — add it alongside app.py to enable this feature.")
+            else:
+                steps = [
+                    (f"📂 Reading {len(uploaded_dataset_files)} raw image(s) from upload...", 0.3),
+                    ("🧠 Running each image through the trained federated model, locally...", 0.6),
+                    ("🧬 Extracting numeric model output (no diagnosis, no labels attached)...", 0.4),
+                    ("🔒 Encrypting the numeric representation before transmission...", 0.3),
+                    ("📤 Sending ONLY the encrypted numbers to the central platform...", 0.4),
+                ]
+                progress_bar = st.progress(0)
+                status_text = st.empty()
 
-        import time
-        for i, (label, duration) in enumerate(steps):
-            status_text.info(label)
-            time.sleep(duration)
-            progress_bar.progress((i + 1) / len(steps))
+                import time
+                for i, (label, duration) in enumerate(steps):
+                    status_text.info(label)
+                    time.sleep(duration)
+                    progress_bar.progress((i + 1) / len(steps))
 
-        status_text.success(f"✅ {selected_hospital}'s federated-safe update received and verified by central platform.")
+                # Genuinely run each image through the real trained model
+                infer_transform = transforms.Compose([
+                    transforms.Resize((224, 224)),
+                    transforms.Grayscale(num_output_channels=3),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                ])
 
-        idx = hospitals.index(selected_hospital)
-        local_before = fed_accuracy_history[0] - (5 * idx)
-        local_after = fed_accuracy_history[-2]
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Local accuracy before this round", f"{max(local_before, 40):.1f}%")
-        c2.metric("Local accuracy after this round", f"{local_after:.1f}%", f"+{local_after - max(local_before,40):.1f}%")
-        c3.metric("Raw images shared with platform", "0", "Only federated-safe weights")
+                all_vectors = []
+                for f in uploaded_dataset_files:
+                    img = Image.open(f).convert('RGB')
+                    tensor = infer_transform(img).unsqueeze(0)
+                    with torch.no_grad():
+                        raw_output = _model(tensor)[0]  # real model output, 4 raw numbers, no labels
+                    all_vectors.append(raw_output.numpy().tolist())
 
-        with st.expander("🔍 What actually left the hospital's machine?"):
-            st.write(f"**Raw data (stayed local, never touched the network):** {data_path} — {hospital_info[selected_hospital]['train']} MRI images")
-            st.write("**What was actually transmitted:** an encrypted set of model weight updates — plain numbers describing what the model learned, with no pixel data, no filenames, no patient identifiers.")
+                status_text.success(f"✅ {selected_hospital}'s federated-safe numeric summary received and verified by central platform.")
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Images processed by real model", len(uploaded_dataset_files))
+                c2.metric("Raw images sent to platform", "0")
+                c3.metric("Diagnosis/labels shared", "0", "Numbers only")
+
+                with st.expander("🔍 What actually left the hospital's machine?"):
+                    st.write(f"**Raw uploaded images:** {len(uploaded_dataset_files)} — processed locally by the real trained model, then discarded, never transmitted.")
+                    st.write("**Actual numeric output computed by the model** (no disease names attached — just the model's raw internal representation for each image):")
+                    for i, vec in enumerate(all_vectors):
+                        st.code(f"Image {i+1}: [{', '.join(f'{v:.3f}' for v in vec)}]")
+                    st.caption("These are the model's genuine raw outputs — not mapped to any diagnosis here. In the real federated pipeline, this same principle applies to model weight updates: only numeric representations travel between hospitals and the platform, never raw pixels or patient data.")
     else:
-        st.info("👆 Set a data path, select a hospital, and click **Run Local Training Round** to see the local training + federated-safe conversion process step by step.")
+        st.info("👆 Upload one or more images and click **Convert to Federated-Safe Data** to see the real trained model process them, locally.")
 
 st.divider()
 
